@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import io from "socket.io-client";
-import { Badge, IconButton, TextField } from '@mui/material';
+import { Badge, IconButton, TextField, Tooltip, Chip } from '@mui/material';
 import { Button } from '@mui/material';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import VideocamOffIcon from '@mui/icons-material/VideocamOff'
@@ -11,6 +11,11 @@ import MicOffIcon from '@mui/icons-material/MicOff'
 import ScreenShareIcon from '@mui/icons-material/ScreenShare';
 import StopScreenShareIcon from '@mui/icons-material/StopScreenShare'
 import ChatIcon from '@mui/icons-material/Chat'
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import PeopleIcon from '@mui/icons-material/People';
+import MeetingTimer from '../components/MeetingTimer';
+import { toast } from 'react-toastify';
+import { useParams } from 'react-router-dom';
 import server from '../environment';
 
 const server_url = server;
@@ -24,38 +29,28 @@ const peerConfigConnections = {
 }
 
 export default function VideoMeetComponent() {
-
+    const { url: meetingCode } = useParams();
     var socketRef = useRef();
     let socketIdRef = useRef();
 
     let localVideoref = useRef();
 
     let [videoAvailable, setVideoAvailable] = useState(true);
-
     let [audioAvailable, setAudioAvailable] = useState(true);
-
     let [video, setVideo] = useState([]);
-
     let [audio, setAudio] = useState();
-
     let [screen, setScreen] = useState();
-
-    let [showModal, setModal] = useState(true);
-
+    let [showModal, setModal] = useState(false);
     let [screenAvailable, setScreenAvailable] = useState();
-
     let [messages, setMessages] = useState([])
-
     let [message, setMessage] = useState("");
-
-    let [newMessages, setNewMessages] = useState(3);
-
+    let [newMessages, setNewMessages] = useState(0);
     let [askForUsername, setAskForUsername] = useState(true);
-
     let [username, setUsername] = useState("");
+    const [meetingStartTime] = useState(Date.now());
+    const [participantCount, setParticipantCount] = useState(1);
 
     const videoRef = useRef([])
-
     let [videos, setVideos] = useState([])
 
     // TODO
@@ -286,9 +281,15 @@ export default function VideoMeetComponent() {
 
             socketRef.current.on('user-left', (id) => {
                 setVideos((videos) => videos.filter((video) => video.socketId !== id))
+                setParticipantCount(prev => Math.max(1, prev - 1));
+                toast.info('A participant left the meeting');
             })
 
             socketRef.current.on('user-joined', (id, clients) => {
+                setParticipantCount(clients.length + 1);
+                if (id !== socketIdRef.current) {
+                    toast.success('A new participant joined');
+                }
                 clients.forEach((socketListId) => {
 
                     connections[socketListId] = new RTCPeerConnection(peerConfigConnections)
@@ -383,12 +384,28 @@ export default function VideoMeetComponent() {
     }
 
     let handleVideo = () => {
-        setVideo(!video);
-        // getUserMedia();
+        const newState = !video;
+        try {
+            const mediaStream = localVideoref.current && localVideoref.current.srcObject;
+            if (mediaStream && mediaStream.getVideoTracks) {
+                mediaStream.getVideoTracks().forEach(track => {
+                    track.enabled = newState;
+                })
+            }
+        } catch (e) { console.log(e) }
+        setVideo(newState);
     }
     let handleAudio = () => {
-        setAudio(!audio)
-        // getUserMedia();
+        const newState = !audio;
+        try {
+            const mediaStream = localVideoref.current && localVideoref.current.srcObject;
+            if (mediaStream && mediaStream.getAudioTracks) {
+                mediaStream.getAudioTracks().forEach(track => {
+                    track.enabled = newState;
+                })
+            }
+        } catch (e) { console.log(e) }
+        setAudio(newState);
     }
 
     useEffect(() => {
@@ -401,11 +418,20 @@ export default function VideoMeetComponent() {
     }
 
     let handleEndCall = () => {
-        try {
-            let tracks = localVideoref.current.srcObject.getTracks()
-            tracks.forEach(track => track.stop())
-        } catch (e) { }
-        window.location.href = "/"
+        if (window.confirm('Are you sure you want to leave the meeting?')) {
+            try {
+                if (socketRef.current) {
+                    socketRef.current.disconnect();
+                }
+                let tracks = localVideoref.current?.srcObject?.getTracks()
+                if (tracks) {
+                    tracks.forEach(track => track.stop())
+                }
+            } catch (e) { 
+                console.log(e);
+            }
+            window.location.href = "/home"
+        }
     }
 
     let openChat = () => {
@@ -432,11 +458,11 @@ export default function VideoMeetComponent() {
 
 
     let sendMessage = () => {
-        console.log(socketRef.current);
-        socketRef.current.emit('chat-message', message, username)
-        setMessage("");
-
-        // this.setState({ message: "", sender: username })
+        if (!message.trim()) return;
+        if (socketRef.current) {
+            socketRef.current.emit('chat-message', message, username)
+            setMessage("");
+        }
     }
 
     
@@ -451,75 +477,213 @@ export default function VideoMeetComponent() {
 
             {askForUsername === true ?
 
-                <div>
+                <div className="d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '100vh', background: 'var(--color-bg)', padding: '20px' }}>
+                    <div className="text-center mb-4" style={{ maxWidth: '400px', width: '100%' }}>
+                        <h2 className="text-white mb-4">Enter into Lobby</h2>
+                        <div className="d-flex flex-column flex-sm-row gap-3 mb-4">
+                            <TextField 
+                                id="outlined-basic" 
+                                label="Username" 
+                                value={username} 
+                                onChange={e => setUsername(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && username.trim() && connect()}
+                                variant="outlined"
+                                fullWidth
+                                InputLabelProps={{ sx: { color: 'var(--color-text-muted)' } }}
+                                InputProps={{ sx: { color: '#fff', 
+                                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'var(--color-elev-2)' },
+                                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'var(--color-primary)' },
+                                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'var(--color-primary)' }
+                                } }}
+                            />
+                            <Button 
+                                variant="contained" 
+                                onClick={connect}
+                                disabled={!username.trim()}
+                                sx={{ 
+                                    bgcolor: 'var(--color-primary)', 
+                                    '&:hover': { bgcolor: 'var(--color-primary-600)' },
+                                    minWidth: '120px',
+                                    py: 1.5
+                                }}
+                            >
+                                Connect
+                            </Button>
+                        </div>
 
-
-                    <h2>Enter into Lobby </h2>
-                    <TextField id="outlined-basic" label="Username" value={username} onChange={e => setUsername(e.target.value)} variant="outlined" />
-                    <Button variant="contained" onClick={connect}>Connect</Button>
-
-
-                    <div>
-                        <video ref={localVideoref} autoPlay muted></video>
+                        <div className="d-flex justify-content-center">
+                            <video 
+                                ref={localVideoref} 
+                                autoPlay 
+                                muted
+                                style={{
+                                    width: '100%',
+                                    maxWidth: '400px',
+                                    borderRadius: '12px',
+                                    background: '#000'
+                                }}
+                            ></video>
+                        </div>
                     </div>
-
                 </div> :
 
 
                 <div className={styles.meetVideoContainer}>
+                    <div className={styles.meetingHeader}>
+                        <div className="d-flex align-items-center gap-3">
+                            <MeetingTimer startTime={meetingStartTime} />
+                            <Chip 
+                                icon={<PeopleIcon />}
+                                label={`${participantCount} ${participantCount === 1 ? 'Participant' : 'Participants'}`}
+                                sx={{ 
+                                    background: 'rgba(0,0,0,0.5)',
+                                    color: '#fff',
+                                    '& .MuiChip-icon': { color: '#fff' }
+                                }}
+                            />
+                            <Chip 
+                                label={meetingCode}
+                                sx={{ 
+                                    background: 'rgba(0,0,0,0.5)',
+                                    color: '#fff',
+                                    fontFamily: 'monospace'
+                                }}
+                            />
+                            <Tooltip title="Copy meeting code">
+                                <IconButton 
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(meetingCode);
+                                        toast.success('Meeting code copied!');
+                                    }}
+                                    sx={{ 
+                                        color: '#fff',
+                                        background: 'rgba(0,0,0,0.3)',
+                                        '&:hover': { background: 'rgba(0,0,0,0.5)' }
+                                    }}
+                                    size="small"
+                                >
+                                    <ContentCopyIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
+                        </div>
+                    </div>
 
                     {showModal ? <div className={styles.chatRoom}>
-
                         <div className={styles.chatContainer}>
-                            <h1>Chat</h1>
+                            <h1 style={{ fontSize: '1.5rem', marginBottom: '16px', color: '#111' }}>Chat</h1>
 
                             <div className={styles.chattingDisplay}>
-
                                 {messages.length !== 0 ? messages.map((item, index) => {
-
-                                    console.log(messages)
                                     return (
-                                        <div style={{ marginBottom: "20px" }} key={index}>
-                                            <p style={{ fontWeight: "bold" }}>{item.sender}</p>
-                                            <p>{item.data}</p>
+                                        <div style={{ marginBottom: "16px", padding: "8px", background: "#f5f5f5", borderRadius: "8px" }} key={index}>
+                                            <p style={{ fontWeight: "bold", marginBottom: "4px", color: "#333" }}>{item.sender}</p>
+                                            <p style={{ color: "#555", margin: 0 }}>{item.data}</p>
                                         </div>
                                     )
-                                }) : <p>No Messages Yet</p>}
-
-
+                                }) : <p style={{ color: "#999", textAlign: "center", marginTop: "20px" }}>No Messages Yet</p>}
                             </div>
 
                             <div className={styles.chattingArea}>
-                                <TextField value={message} onChange={(e) => setMessage(e.target.value)} id="outlined-basic" label="Enter Your chat" variant="outlined" />
-                                <Button variant='contained' onClick={sendMessage}>Send</Button>
+                                <TextField 
+                                    value={message} 
+                                    onChange={(e) => setMessage(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && message.trim() && sendMessage()}
+                                    id="outlined-basic" 
+                                    label="Enter Your message" 
+                                    variant="outlined"
+                                    fullWidth
+                                    size="small"
+                                />
+                                <Button 
+                                    variant='contained' 
+                                    onClick={sendMessage}
+                                    disabled={!message.trim()}
+                                    sx={{ minWidth: '80px' }}
+                                >
+                                    Send
+                                </Button>
                             </div>
-
-
                         </div>
                     </div> : <></>}
 
 
                     <div className={styles.buttonContainers}>
-                        <IconButton onClick={handleVideo} style={{ color: "white" }}>
+                        <IconButton 
+                            onClick={handleVideo} 
+                            sx={{
+                                bgcolor: video ? 'var(--color-elev-2)' : '#d32f2f', 
+                                color: '#fff', 
+                                mx: { xs: 0.5, sm: 1 },
+                                '&:hover': { bgcolor: video ? 'var(--color-surface)' : '#c62828' },
+                                width: { xs: 48, sm: 56 },
+                                height: { xs: 48, sm: 56 }
+                            }}
+                            aria-label={video ? "Turn off camera" : "Turn on camera"}
+                        >
                             {(video === true) ? <VideocamIcon /> : <VideocamOffIcon />}
                         </IconButton>
-                        <IconButton onClick={handleEndCall} style={{ color: "red" }}>
-                            <CallEndIcon  />
+                        <IconButton 
+                            onClick={handleEndCall}
+                            sx={{ 
+                                bgcolor: 'var(--color-danger)', 
+                                color: '#fff', 
+                                mx: { xs: 0.5, sm: 1 }, 
+                                '&:hover': { opacity: .9 },
+                                width: { xs: 48, sm: 56 },
+                                height: { xs: 48, sm: 56 }
+                            }}
+                            aria-label="End call"
+                        >
+                            <CallEndIcon />
                         </IconButton>
-                        <IconButton onClick={handleAudio} style={{ color: "white" }}>
+                        <IconButton 
+                            onClick={handleAudio}
+                            sx={{
+                                bgcolor: audio ? 'var(--color-elev-2)' : '#d32f2f', 
+                                color: '#fff', 
+                                mx: { xs: 0.5, sm: 1 },
+                                '&:hover': { bgcolor: audio ? 'var(--color-surface)' : '#c62828' },
+                                width: { xs: 48, sm: 56 },
+                                height: { xs: 48, sm: 56 }
+                            }}
+                            aria-label={audio ? "Mute microphone" : "Unmute microphone"}
+                        >
                             {audio === true ? <MicIcon /> : <MicOffIcon />}
                         </IconButton>
 
-                        {screenAvailable === true ?
-                            <IconButton onClick={handleScreen} style={{ color: "white" }}>
+                        {screenAvailable === true && (
+                            <IconButton 
+                                onClick={handleScreen}
+                                sx={{
+                                    bgcolor: screen ? 'var(--color-primary)' : 'var(--color-elev-2)', 
+                                    color: '#fff', 
+                                    mx: { xs: 0.5, sm: 1 },
+                                    '&:hover': { bgcolor: screen ? 'var(--color-primary-600)' : 'var(--color-surface)' },
+                                    width: { xs: 48, sm: 56 },
+                                    height: { xs: 48, sm: 56 }
+                                }}
+                                aria-label={screen ? "Stop sharing" : "Share screen"}
+                            >
                                 {screen === true ? <ScreenShareIcon /> : <StopScreenShareIcon />}
-                            </IconButton> : <></>}
+                            </IconButton>
+                        )}
 
-                        <Badge badgeContent={newMessages} max={999} color='orange'>
-                            <IconButton onClick={() => setModal(!showModal)} style={{ color: "white" }}>
-                                <ChatIcon />                        </IconButton>
+                        <Badge badgeContent={newMessages} max={999} color='warning'>
+                            <IconButton 
+                                onClick={() => setModal(!showModal)}
+                                sx={{
+                                    bgcolor: showModal ? 'var(--color-primary)' : 'var(--color-elev-2)', 
+                                    color: '#fff', 
+                                    mx: { xs: 0.5, sm: 1 },
+                                    '&:hover': { bgcolor: showModal ? 'var(--color-primary-600)' : 'var(--color-surface)' },
+                                    width: { xs: 48, sm: 56 },
+                                    height: { xs: 48, sm: 56 }
+                                }}
+                                aria-label="Toggle chat"
+                            >
+                                <ChatIcon />
+                            </IconButton>
                         </Badge>
-
                     </div>
 
 

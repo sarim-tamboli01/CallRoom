@@ -1,77 +1,99 @@
+
 .landingPageContainer {
   width: 100vw;
   height: 100vh;
-  background: url("/public/background.png");
+  background: linear-gradient(180deg, rgba(11,16,32,.8), rgba(11,16,32,.9)), url('/background.png');
   background-repeat: no-repeat;
   background-size: cover;
-  color: white;
+  color: var(--color-text);
 }
 
 .landingPageContainer nav {
   padding-inline: 1.2rem;
-  padding-block: 1.6rem;
+  padding-block: 1.2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-
 }
 
 .landingPageContainer nav h2 {
-  font-size: 1.8rem;
-  font-weight: 500;
+  font-size: 1.6rem;
+  font-weight: 700;
 }
 
 .landingPageContainer nav .navlist {
   display: flex;
-  gap: 1.6rem;
-  cursor: pointer;
+  gap: 1rem;
+  align-items: center;
+}
 
+.landingPageContainer nav .navlist p {
+  color: var(--color-text-muted);
+  transition: color .2s ease;
+  cursor: pointer;
+}
+.landingPageContainer nav .navlist p:hover {
+  color: var(--color-text);
 }
 
 .landingMainContainer {
   display: flex;
   justify-content: space-between;
+  gap: 4rem;
   padding-inline: 3rem;
   height: 80vh;
   align-items: center;
 }
 
 .landingMainContainer>div:nth-child(1) {
-  font-size: 2.2rem;
+  max-width: 640px;
+}
+.landingMainContainer>div:nth-child(1) h1 {
+  font-size: 3rem;
+  line-height: 1.1;
+}
+.landingMainContainer>div:nth-child(1) p {
+  margin-top: .8rem;
+  color: var(--color-text-muted);
 }
 
 .landingMainContainer>div:nth-child(1) div[role='button'] {
-  background: #D97500;
+  background: var(--color-accent);
   width: fit-content;
-  padding: 1rem;
-  border-radius: 20px;
-  margin-top: 1.9rem;
+  padding: .9rem 1.2rem;
+  border-radius: var(--radius-lg);
+  margin-top: 1.6rem;
+  box-shadow: var(--shadow-sm);
 }
 
 .landingMainContainer>div:nth-child(1) div[role='button'] a {
   text-decoration: none;
-  color: white;
-  font-size: 1.7rem;
+  color: #111;
+  font-size: 1.1rem;
+  font-weight: 700;
 }
 
 .landingMainContainer>div:nth-child(2) img {
-  height: 70vh;
+  height: 64vh;
   width: auto;
+  filter: drop-shadow(0 10px 24px rgba(0,0,0,.35));
 }
 
 .navBar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-inline: 20px;
+  padding-inline: 24px;
+  padding-block: 16px;
   text-align: center;
-
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 .meetContainer {
   display: flex;
-  padding-inline: 20px;
+  padding-inline: 24px;
   height: 80vh;
-  gap: 10vw;
+  gap: 8vw;
   justify-content: center;
 }
 
@@ -81,7 +103,6 @@
   height: 100%;
   display: flex;
   align-items: center;
-
 }
 
 .rightPanel {
@@ -92,5 +113,79 @@
 .rightPanel > img {
   width: 30vw;
   height: auto;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Responsive Utilities */
+.hover-white:hover {
+  color: #fff !important;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .landingMainContainer {
+    gap: 3rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  .landingMainContainer {
+    gap: 2rem;
+  }
+  .landingMainContainer>div:nth-child(2) img { 
+    height: 50vh; 
+    max-height: 500px;
+  }
+  .meetContainer { 
+    gap: 4rem; 
+  }
+}
+
+@media (max-width: 768px) {
+  .landingPageContainer nav {
+    padding-inline: 1rem;
+  }
+  .landingMainContainer {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    height: auto;
+    padding-block: 48px;
+    gap: 2rem;
+  }
+  .landingMainContainer>div:nth-child(1) h1 { 
+    font-size: 2.2rem; 
+    line-height: 1.2;
+  }
+  .landingMainContainer>div:nth-child(2) img { 
+    height: 40vh;
+    max-height: 400px;
+  }
+  .rightPanel > img { 
+    width: 80vw; 
+    max-width: 400px;
+  }
+  .meetContainer { 
+    flex-direction: column; 
+    gap: 32px; 
+    height: auto; 
+    padding-block: 32px;
+    text-align: center;
+  }
+  .navBar {
+    padding-inline: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .landingMainContainer>div:nth-child(1) h1 { 
+    font-size: 1.8rem; 
+  }
+  .landingMainContainer>div:nth-child(1) p {
+    font-size: 0.95rem;
+  }
+  .landingMainContainer>div:nth-child(2) img { 
+    height: 35vh;
+  }
 }
